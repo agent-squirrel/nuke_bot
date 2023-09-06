@@ -1,0 +1,9 @@
+---
+discord:
+  token: 
+  accepted_channels:
+    - channelid
+    - secondchannelid
+  # 24 hour notation
+  channel_delete_time: '10:00'
+  channel_warning_time: '09:55'
