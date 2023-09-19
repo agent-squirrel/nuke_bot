@@ -28,7 +28,78 @@ def main():
             print('Starting deletion warning scheduled task')
         if not auto_nuke.is_running():
             auto_nuke.start()
-            print('Starting nuke scheduled task')
+            print('Starting auto nuke scheduled task')
+
+    async def nuke(ctx, weapon, deleted, message_count, auto_nuke=0, channel=0):
+        if deleted == 0:
+            if auto_nuke == 0:
+                print(f'Command called from {ctx.channel.name} by {ctx.author.name} using {weapon}')
+                print(f'Message count is {message_count}')
+                for _ in accepted_channels:
+                    if ctx.channel.id not in accepted_channels:
+                        print(f'{ctx.channel.name} is not in the accepted channel list, not running', flush=True)
+                        return
+            for i in range(3,0,-1):
+                if auto_nuke == 0:
+                    await ctx.channel.send(f'{weapon} in {i}')
+                else:
+                    await channel.send(f'{weapon} in {i}')
+                time.sleep(1)
+            if weapon == 'Nuke':
+                await ctx.channel.send('RBMK reactors don\'t explode')
+                await ctx.send(file=discord.File('assets/images/nuke.gif'))
+            elif weapon == 'Exterminatus' and auto_nuke == 0:
+                await ctx.channel.send('In his name')
+                await ctx.send(file=discord.File('assets/images/exterminatus.gif'))
+            else:
+                await channel.send('In his name')
+                await channel.send(file=discord.File('assets/images/exterminatus.gif'))
+            time.sleep(2)
+        if auto_nuke == 0:
+            deleted = len(await ctx.channel.purge(limit=100))
+        else:
+            deleted = len(await channel.purge(limit=100))
+        if deleted < 100:
+            embed = discord.Embed(title=f'{weapon} complete', color=0xe42313)
+            embed.description = f'{message_count} messages were destroyed'
+            if auto_nuke == 0:
+                await ctx.send(embed=embed)
+            else:
+                await channel.send(embed=embed)
+            print(f'{weapon} complete. {message_count} messages were deleted.', flush=True)
+            return
+        elif auto_nuke == 0:
+            await nuke(ctx, weapon, deleted+100, message_count)
+            return
+        else:
+            await nuke(channel, weapon, deleted+100, message_count, auto_nuke)
+            return
+
+    @tasks.loop(time=datetime.time(hour=nuke_time.hour, minute=nuke_time.minute, tzinfo=ZoneInfo('Australia/Hobart')))
+    async def auto_nuke():
+        print('Deploying auto nuke')
+        weapon = 'Exterminatus'
+        message_count = 0
+        ctx = None
+        auto_nuke = 1
+        for channel_id in accepted_channels:
+            channel = client.get_channel(channel_id)
+            async for _ in channel.history(limit=None):
+                message_count += 1
+            deleted = 0
+            await nuke(ctx, weapon, deleted, message_count, auto_nuke, channel)
+    
+    @client.command(name='nuke', brief='Deletes all mesages from the current channel', aliases=['exterminatus'])
+    async def manual_nuke(ctx):
+        print('Deploying nuke')
+        message_count = 0
+        deleted = 0
+        auto_nuke = 0
+        channel = 0
+        weapon = ctx.invoked_with.capitalize()
+        async for _ in ctx.channel.history(limit=None):
+            message_count += 1
+        await nuke(ctx, weapon, deleted, message_count, auto_nuke)
 
     @tasks.loop(time=datetime.time(hour=warning_time.hour, minute=warning_time.minute, tzinfo=ZoneInfo('Australia/Hobart')))
     async def warning():
@@ -36,60 +107,7 @@ def main():
         for channel_id in accepted_channels:
             channel = client.get_channel(channel_id)
             await channel.send('This channel will be nuked in 5 minutes!')
-
-    @tasks.loop(time=datetime.time(hour=nuke_time.hour, minute=nuke_time.minute, tzinfo=ZoneInfo('Australia/Hobart')))
-    async def auto_nuke(deleted=0):
-        weapon = 'Exterminatus'
-        print('Sending nuke')
-        for channel_id in accepted_channels:
-            channel = client.get_channel(channel_id)
-            for i in range(3,0,-1):
-                await channel.send(f'{weapon} in {i}')
-                time.sleep(1)
-            await channel.send('No one expects The Inquisition')
-            await channel.send(file=discord.File('assets/images/exterminatus.gif'))
-            time.sleep(2)
-            deleted = len(await channel.purge(limit=100))
-        if deleted < 100:
-            embed = discord.Embed(title=f'{weapon} complete', color=0xe42313)
-            embed.description = f'{deleted} messages were destroyed'
-            await channel.send(embed=embed)
-            print(f'{deleted} messages were deleted.', flush=True)
-            return
-        else:
-            await auto_nuke(deleted+100)
-            return
-    
-    @client.command(name='nuke', brief='Deletes all messages from the current channel', aliases=['exterminatus'])
-    async def nuke(ctx, deleted=0):
-        weapon = ctx.invoked_with.capitalize()
-        if deleted == 0:
-            print(f'Command called from {ctx.channel.name} by {ctx.author.name} using {weapon}')
-            for channel in accepted_channels:
-                if ctx.channel.id not in accepted_channels:
-                    print(f'{ctx.channel.name} is not in the accepted channel list, not running', flush=True)
-                    return
-            for i in range(3,0,-1):
-                await ctx.channel.send(f'{weapon} in {i}')
-                time.sleep(1)
-            if ctx.invoked_with == 'nuke':
-                await ctx.channel.send('RBMK reactors don\'t explode')
-                await ctx.send(file=discord.File('assets/images/nuke.gif'))
-            else:
-                await ctx.channel.send('In his name')
-                await ctx.send(file=discord.File('assets/images/exterminatus.gif'))
-            time.sleep(2)
-        deleted = len(await ctx.channel.purge(limit=100))
-        if deleted < 100:
-            embed = discord.Embed(title=f'{weapon} complete', color=0xe42313)
-            embed.description = f'{deleted} messages were destroyed'
-            await ctx.send(embed=embed)
-            print(f'{deleted} messages were deleted.', flush=True)
-            return
-        else:
-            await nuke(ctx, deleted+100)
-            return
-
+            
     client.run(discord_token)
 
 if __name__ == "__main__":
