@@ -72,7 +72,7 @@ def main():
             await nuke(ctx, weapon, deleted+100, message_count)
             return
         else:
-            await nuke(channel, weapon, deleted+100, message_count, auto_nuke)
+            await nuke(ctx, weapon, deleted+100, message_count, auto_nuke, channel)
             return
 
     @tasks.loop(time=datetime.time(hour=nuke_time.hour, minute=nuke_time.minute, tzinfo=ZoneInfo('Australia/Hobart')))
