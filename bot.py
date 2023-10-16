@@ -5,6 +5,7 @@ import datetime
 from discord.ext import commands, tasks
 import yaml
 from zoneinfo import ZoneInfo
+import random
 
 with open ('config.yaml', 'r') as f:
     config = yaml.safe_load(f)
@@ -46,14 +47,17 @@ def main():
                     await channel.send(f'{weapon} in {i}')
                 time.sleep(1)
             if weapon == 'Nuke':
+                gifs = config['gifs']['nuke']
                 await ctx.channel.send('RBMK reactors don\'t explode')
-                await ctx.send(file=discord.File('assets/images/nuke.gif'))
+                await ctx.send(file=discord.File(random.choice(gifs)))
             elif weapon == 'Exterminatus' and auto_nuke == 0:
+                gifs = config['gifs']['exterminatus']
                 await ctx.channel.send('In his name')
-                await ctx.send(file=discord.File('assets/images/exterminatus.gif'))
+                await ctx.send(file=discord.File(random.choice(gifs)))
             else:
-                await channel.send('In his name')
-                await channel.send(file=discord.File('assets/images/exterminatus.gif'))
+                gifs = config['gifs']['exterminatus']
+                await ctx.channel.send('In his name')
+                await ctx.send(file=discord.File(random.choice(gifs)))
             time.sleep(2)
         if auto_nuke == 0:
             deleted = len(await ctx.channel.purge(limit=100))
