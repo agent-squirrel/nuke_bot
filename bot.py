@@ -56,8 +56,8 @@ def main():
                 await ctx.send(file=discord.File(random.choice(gifs)))
             else:
                 gifs = config['gifs']['exterminatus']
-                await ctx.channel.send('In his name')
-                await ctx.send(file=discord.File(random.choice(gifs)))
+                await channel.send('In his name')
+                await channel.send(file=discord.File(random.choice(gifs)))
             time.sleep(2)
         if auto_nuke == 0:
             deleted = len(await ctx.channel.purge(limit=100))
