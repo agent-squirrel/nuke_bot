@@ -7,3 +7,16 @@ discord:
   # 24 hour notation
   channel_delete_time: '10:00'
   channel_warning_time: '09:55'
+
+gifs:
+  exterminatus:
+    - "assets/images/exterminatus1.gif"
+    - "assets/images/exterminatus2.gif"
+    - "assets/images/exterminatus3.gif"
+  nuke:
+    - "assets/images/nuke1.gif"
+    - "assets/images/nuke2.gif"
+    - "assets/images/nuke3.gif"
+
+monitoring:
+  endpoint: 'https://someendpoint.com'
