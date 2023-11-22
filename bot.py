@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import time
 import discord
+import aiohttp
 import datetime
 from discord.ext import commands, tasks
 import yaml
@@ -17,6 +18,7 @@ raw_nuke_time = config['discord']['channel_delete_time']
 raw_warning_time = config['discord']['channel_warning_time']
 nuke_time = datetime.datetime.strptime(raw_nuke_time, time_format)
 warning_time = datetime.datetime.strptime(raw_warning_time, time_format)
+monitoring_endpoint = config['monitoring']['endpoint']
 client = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 
 def main():
@@ -30,6 +32,9 @@ def main():
         if not auto_nuke.is_running():
             auto_nuke.start()
             print('Starting auto nuke scheduled task')
+        if not monitor.is_running():
+            monitor.start()
+            print('Starting heartbeat scheduled task')
 
     async def nuke(ctx, weapon, deleted, message_count, auto_nuke=0, channel=0):
         if deleted == 0:
@@ -111,6 +116,20 @@ def main():
         for channel_id in accepted_channels:
             channel = client.get_channel(channel_id)
             await channel.send('This channel will be nuked in 5 minutes!')
+
+    @tasks.loop(seconds=59)
+    async def monitor():
+        print('Sending heartbeat to monitoring.gnuplusadam.com')
+        async with aiohttp.ClientSession(raise_for_status=True) as session:
+            try:
+                monitor = await session.get(monitoring_endpoint)
+                data = await monitor.json()
+                if data['ok'] == True:
+                    return
+                else:
+                    print('Didn\'t get expected response from monitoring endpoint.')
+            except aiohttp.ClientResponseError as e:
+                print('Connection error, monitoring endpoint is down!!', str(e))
             
     client.run(discord_token)
 
