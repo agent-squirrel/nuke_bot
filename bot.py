@@ -73,8 +73,12 @@ def main():
             embed.description = f'{message_count} messages were destroyed'
             if auto_nuke == 0:
                 await ctx.send(embed=embed)
+                if ctx.channel.id == 1128490059339935846:
+                    await ctx.send(file=discord.File('assets/images/spice.gif'))
             else:
                 await channel.send(embed=embed)
+                if channel.id == 1128490059339935846:
+                    await channel.send(file=discord.File('assets/images/spice.gif'))
             print(f'{weapon} complete. {message_count} messages were deleted.', flush=True)
             return
         elif auto_nuke == 0:
