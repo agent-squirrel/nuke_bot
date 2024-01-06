@@ -15,6 +15,8 @@ with open ('config.yaml', 'r') as f:
 time_format = "%H:%M"
 discord_token = config['discord']['token']
 accepted_channels = config['discord']['accepted_channels']
+guilds = config['discord']['guilds']
+presence_msg = config['discord']['presence_msg']
 tz = datetime.datetime.now().astimezone().tzinfo
 raw_nuke_time = config['discord']['channel_delete_time']
 raw_warning_time = config['discord']['channel_warning_time']
@@ -28,6 +30,8 @@ def main():
     async def on_ready():
         print('Weapons ready')
         print(f'Channel nuke time is {raw_nuke_time}, warning time is {raw_warning_time} and timezone is {tz}')
+        print(f'Setting presence to: {presence_msg}')
+        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=presence_msg))
         if not warning.is_running():
             warning.start()
             print('Starting deletion warning scheduled task')
@@ -89,7 +93,7 @@ def main():
             await nuke_routine(ctx, weapon, deleted+100, message_count, auto_nuke, channel)
             return
     
-    @bot.slash_command(description='Nukes the chat in a spectacular white hot fireball', guild_ids=[1061915441246781440])
+    @bot.slash_command(description='Nukes the chat in a spectacular white hot fireball', guild_ids=guilds)
     async def nuke(ctx):
         view = nuke_controls()
         await ctx.respond(view=view)
@@ -108,7 +112,7 @@ def main():
             print('Aborting nuke')
             return
 
-    @bot.slash_command(description='Calls down the holy wrath of the inquisition', guild_ids=[1061915441246781440])
+    @bot.slash_command(description='Calls down the holy wrath of the inquisition', guild_ids=guilds)
     async def exterminatus(ctx):
         view = exterminatus_controls()
         await ctx.respond(view=view)
