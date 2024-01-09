@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import logging
 from buttons import nuke_controls, exterminatus_controls
 import time
 import discord
@@ -20,16 +21,30 @@ presence_msg = config['discord']['presence_msg']
 tz = datetime.datetime.now().astimezone().tzinfo
 raw_nuke_time = config['discord']['channel_delete_time']
 raw_warning_time = config['discord']['channel_warning_time']
-nuke_time = datetime.datetime.strptime(raw_nuke_time, time_format)
-warning_time = datetime.datetime.strptime(raw_warning_time, time_format)
+nuke_time = datetime.datetime.strptime(raw_nuke_time, time_format).time()
+warning_time = datetime.datetime.strptime(raw_warning_time, time_format).time()
 monitoring_endpoint = config['monitoring']['endpoint']
+config_log_level = config['logging']['level']
+logging_dict = {'DEBUG': logging.DEBUG, 
+                'INFO': logging.INFO,
+                'WARNING': logging.WARNING,
+                'ERROR': logging.ERROR,
+                }
+logger = logging.getLogger('discord')
+log_level = logging_dict.get(config_log_level, logging.INFO)
+logger.setLevel(log_level)
+handler = logging.FileHandler(filename='bot.log', encoding='utf-8', mode='w')
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
+
 bot = discord.Bot()
 
 def main():
     @bot.event
     async def on_ready():
         print('Weapons ready')
-        print(f'Channel nuke time is {raw_nuke_time}, warning time is {raw_warning_time} and timezone is {tz}')
+        #print(f'Channel nuke time is {raw_nuke_time}, warning time is {raw_warning_time} and timezone is {tz}')
+        print(f'Channel nuke time is {nuke_time}, warning time is {warning_time} and timezone is {tz}')
         print(f'Setting presence to: {presence_msg}')
         await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=presence_msg))
         if not warning.is_running():
@@ -131,7 +146,7 @@ def main():
             print('Aborting exterminatus')
             return
 
-    @tasks.loop(time=datetime.time(hour=nuke_time.hour, minute=nuke_time.minute, tzinfo=tz))
+    @tasks.loop(time=datetime.time(hour=nuke_time.hour, minute=nuke_time.minute, tzinfo=tz), reconnect=False)
     async def auto_nuke():
         print('Deploying auto nuke')
         weapon = 'Exterminatus'
@@ -145,7 +160,7 @@ def main():
             deleted = 0
             await nuke_routine(ctx, weapon, deleted, message_count, auto_nuke, channel)
 
-    @tasks.loop(time=datetime.time(hour=warning_time.hour, minute=warning_time.minute, tzinfo=tz))
+    @tasks.loop(time=datetime.time(hour=warning_time.hour, minute=warning_time.minute, tzinfo=tz), reconnect=False)
     async def warning():
         print('Sending deletion warning')
         for channel_id in accepted_channels:
