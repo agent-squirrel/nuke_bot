@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import logging
-import asyncio
 from buttons import nuke_controls, exterminatus_controls
 import time
 import discord
@@ -44,31 +43,18 @@ def main():
     @bot.event
     async def on_ready():
         print('Weapons ready')
-        #print(f'Channel nuke time is {raw_nuke_time}, warning time is {raw_warning_time} and timezone is {tz}')
         print(f'Channel nuke time is {nuke_time}, warning time is {warning_time} and timezone is {tz}')
         print(f'Setting presence to: {presence_msg}')
         await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=presence_msg))
-        if not warning.is_running():
-            warning.start()
-            print('Starting deletion warning scheduled task')
-        if not auto_nuke.is_running():
-            auto_nuke.start()
-            print('Starting auto nuke scheduled task')
+#        if not warning.is_running():
+#            warning.start()
+#            print('Starting deletion warning scheduled task')
+#        if not auto_nuke.is_running():
+#            auto_nuke.start()
+#            print('Starting auto nuke scheduled task')
         if not monitor.is_running():
             monitor.start()
             print('Starting heartbeat scheduled task')
-
-    async def process_nuke_channels(channel_id, ctx, weapon, auto_nuke):
-        channel = bot.get_channel(channel_id)
-        message_count = 0
-        async for _ in channel.history(limit=None):
-        	message_count += 1
-        deleted = 0
-        await nuke_routine(ctx, weapon, deleted, message_count, auto_nuke, channel)
-
-    async def process_warning_channels(channel_id):
-        channel = bot.get_channel(channel_id)
-        await channel.send('This channel will be nuked in 5 minutes!')
 
     async def nuke_routine(ctx, weapon, deleted, message_count, auto_nuke=0, channel=0):
         if deleted == 0:
@@ -79,6 +65,7 @@ def main():
                     if ctx.channel.id not in accepted_channels:
                         print(f'{ctx.channel.name} is not in the accepted channel list, not running', flush=True)
                         return
+
             for i in range(3,0,-1):
                 if auto_nuke == 0:
                     await ctx.channel.send(f'{weapon} in {i}')
@@ -97,6 +84,7 @@ def main():
                 await channel.send('In his name')
                 await channel.send(file=discord.File(random.choice(gifs)))
             time.sleep(2)
+
         if auto_nuke == 0:
             deleted = len(await ctx.channel.purge(limit=100))
         else:
@@ -108,12 +96,15 @@ def main():
                 await ctx.send(embed=embed)
                 if ctx.channel.id == 1128490059339935846:
                     await ctx.send(file=discord.File('assets/images/spice.gif'))
-                print(f'{weapon} complete. {message_count} messages were deleted from {ctx.channel.name}.', flush=True)
+                elif ctx.channel.id == 1126322559122677812:
+                    await ctx.send(file=discord.File('assets/images/yakobs.gif'))
             else:
                 await channel.send(embed=embed)
                 if channel.id == 1128490059339935846:
                     await channel.send(file=discord.File('assets/images/spice.gif'))
-                print(f'{weapon} complete. {message_count} messages were deleted from {channel.name}.', flush=True)
+                elif ctx.channel.id == 1126322559122677812:
+                    await ctx.send(file=discord.File('assets/images/yakobs.gif'))
+            print(f'{weapon} complete. {message_count} messages were deleted.', flush=True)
             return
         elif auto_nuke == 0:
             await nuke_routine(ctx, weapon, deleted+100, message_count)
@@ -167,14 +158,19 @@ def main():
         message_count = 0
         ctx = None
         auto_nuke = 1
-        tasks = [process_nuke_channels(channel_id, ctx, weapon, auto_nuke) for channel_id in accepted_channels]
-        await asyncio.gather(*tasks)
+        for channel_id in accepted_channels:
+            channel = bot.get_channel(channel_id)
+            async for _ in channel.history(limit=None):
+                message_count += 1
+            deleted = 0
+            await nuke_routine(ctx, weapon, deleted, message_count, auto_nuke, channel)
 
     @tasks.loop(time=datetime.time(hour=warning_time.hour, minute=warning_time.minute, tzinfo=tz), reconnect=False)
     async def warning():
         print('Sending deletion warning')
-        tasks = [process_warning_channels(channel_id) for channel_id in accepted_channels]
-        await asyncio.gather(*tasks)
+        for channel_id in accepted_channels:
+            channel = bot.get_channel(channel_id)
+            await channel.send('This channel will be nuked in 5 minutes!')
 
     @tasks.loop(seconds=59)
     async def monitor():
