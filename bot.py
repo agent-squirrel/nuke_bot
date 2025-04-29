@@ -94,13 +94,13 @@ def main():
             embed.description = f'{message_count} messages were destroyed'
             if auto_nuke == 0:
                 await ctx.send(embed=embed)
-                if ctx.channel.id == 1128490059339935846:
+                if ctx.channel.id == 1317720410808258568:
                     await ctx.send(file=discord.File('assets/images/spice.gif'))
                 elif ctx.channel.id == 1126322559122677812:
                     await ctx.send(file=discord.File('assets/images/yakobs.gif'))
             else:
                 await channel.send(embed=embed)
-                if channel.id == 1128490059339935846:
+                if channel.id == 1317720410808258568:
                     await channel.send(file=discord.File('assets/images/spice.gif'))
                 elif ctx.channel.id == 1126322559122677812:
                     await ctx.send(file=discord.File('assets/images/yakobs.gif'))
