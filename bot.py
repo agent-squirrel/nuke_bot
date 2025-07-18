@@ -94,14 +94,18 @@ def main():
             embed.description = f'{message_count} messages were destroyed'
             if auto_nuke == 0:
                 await ctx.send(embed=embed)
-                if ctx.channel.id == 1317720410808258568:
-                    await ctx.send(file=discord.File('assets/images/spice.gif'))
+                spice_channels = [1317720410808258568, 1095581847917965343]
+                if ctx.channel.id in spice_channels:
+                    gifs = config['gifs']['spice']
+                    await ctx.send(file=discord.File(random.choice(gifs)))
                 elif ctx.channel.id == 1126322559122677812:
                     await ctx.send(file=discord.File('assets/images/yakobs.gif'))
             else:
                 await channel.send(embed=embed)
-                if channel.id == 1317720410808258568:
-                    await channel.send(file=discord.File('assets/images/spice.gif'))
+                spice_channels = [1317720410808258568, 1095581847917965343]
+                if channel.id in spice_channels:
+                    gifs = config['gifs']['spice']
+                    await channel.send(file=discord.File(random.choice(gifs)))
                 elif ctx.channel.id == 1126322559122677812:
                     await ctx.send(file=discord.File('assets/images/yakobs.gif'))
             print(f'{weapon} complete. {message_count} messages were deleted.', flush=True)
