@@ -60,12 +60,15 @@ systemctl enable --now nuke_bot
 
 Edit the `config.yaml` file.
 
-Add channel ids to accepted channels. These channels will be nuked automatically and are also able to be manually nuked.
+Add channel ids to accepted channels. These channels can be nuked manually.
 
-Change the channel_delete_time and channel_warning_time to the desired values in 24hr format.
+> [!WARNING]
+> Auto delete is disabled currently due to timers firing at weird times.
 
-The channels to be deleted will recieve a warning at the warning time and will then have their contents deleted at the deletion time.
+~~Change the channel_delete_time and channel_warning_time to the desired values in 24hr format.~~
 
-Manually delete a channel's contents with either `!nuke` or for fun `!exterminatus`.
+~~The channels to be deleted will recieve a warning at the warning time and will then have their contents deleted at the deletion time.~~
 
-After changing the config file, the callout_bot service needs to be restarted.
+Manually delete a channel's contents with either `/nuke` or for fun `/exterminatus`.
+
+After changing the config file, the nuke_bot service needs to be restarted.
