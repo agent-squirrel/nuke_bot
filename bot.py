@@ -214,6 +214,11 @@ def main():
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
             log.error(f'Connection error, monitoring endpoint is down!! {e!r}')
 
+    @monitor.after_loop
+    async def close_monitor_session():
+        if monitor_session is not None:
+            await monitor_session.close()
+
     bot.run(discord_token)
 
 if __name__ == "__main__":
