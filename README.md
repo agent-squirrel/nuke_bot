@@ -37,7 +37,7 @@ pip install -r requirements.txt
 ```
 Create a systemd unit to start the bot automatically.
 ```bash
-cat << EOF >
+cat << EOF > /etc/systemd/system/nuke_bot.service
 [Unit]
 Description=Nuke Discord Bot
 After=network.target
@@ -69,5 +69,7 @@ The channels to be deleted will receive a warning at the warning time and will t
 To post an extra gif after a nuke in specific channels, map the channel id to a gif set under `post_nuke_gifs`.
 
 Manually delete a channel's contents with either `/nuke` or for fun `/exterminatus`.
+
+Messages older than 14 days have to be deleted one at a time, so nuking a big old channel can take a while. `/obliterate` instead deletes the channel and recreates it with the same name, topic, category, position and permissions, which is instant. The bot needs the Manage Channels permission for this. Pins, threads and webhooks are not carried over. Because the recreated channel has a new id, the bot rewrites the old id to the new one in `config.yaml`. An optional `obliterate` gif set can be added under `gifs`, otherwise the nuke gifs are used.
 
 After changing the config file, the nuke_bot service needs to be restarted.

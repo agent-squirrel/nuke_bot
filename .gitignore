@@ -161,3 +161,5 @@ cython_debug/
 
 # Live bot config (contains secrets)
 config.yaml
+bot.log*
+config.yaml.tmp
