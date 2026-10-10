@@ -62,12 +62,11 @@ Edit the `config.yaml` file.
 
 Add channel ids to accepted channels. These channels can be nuked manually.
 
-> [!WARNING]
-> Auto delete is disabled currently due to timers firing at weird times.
+To nuke the accepted channels automatically every day, set `auto_nuke: true`, set `timezone` to an IANA timezone name (e.g. `Australia/Hobart`) and change the channel_delete_time and channel_warning_time to the desired values in 24hr format.
 
-~~Change the channel_delete_time and channel_warning_time to the desired values in 24hr format.~~
+The channels to be deleted will receive a warning at the warning time and will then have their contents deleted at the deletion time.
 
-~~The channels to be deleted will recieve a warning at the warning time and will then have their contents deleted at the deletion time.~~
+To post an extra gif after a nuke in specific channels, map the channel id to a gif set under `post_nuke_gifs`.
 
 Manually delete a channel's contents with either `/nuke` or for fun `/exterminatus`.
 

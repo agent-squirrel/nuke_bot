@@ -11,6 +11,11 @@ discord:
 
   presence_msg: 'Some presence message'
 
+  # IANA timezone name the delete and warning times are in
+  timezone: 'Australia/Hobart'
+  # Automatically nuke accepted channels daily at channel_delete_time
+  auto_nuke: false
+
   # 24 hour notation
   channel_warning_time: '09:55'
   channel_delete_time: '10:00'
@@ -33,6 +38,11 @@ gifs:
     - "assets/images/india2.gif"
     - "assets/images/india3.gif"
     - "assets/images/india4.gif"
+
+# Extra gif posted after a nuke completes, channel id: gif set from above
+post_nuke_gifs:
+  channelid: spice
+  secondchannelid: helen
 
 monitoring:
   endpoint: 'https://someendpoint.com'

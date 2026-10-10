@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import logging
 from buttons import nuke_controls, exterminatus_controls
-import time
+import asyncio
 import discord
 import aiohttp
 import datetime
@@ -18,11 +18,13 @@ discord_token = config['discord']['token']
 accepted_channels = config['discord']['accepted_channels']
 guilds = config['discord']['guilds']
 presence_msg = config['discord']['presence_msg']
-tz = datetime.datetime.now().astimezone().tzinfo
+tz = ZoneInfo(config['discord']['timezone'])
+auto_nuke_enabled = config['discord'].get('auto_nuke', False)
 raw_nuke_time = config['discord']['channel_delete_time']
 raw_warning_time = config['discord']['channel_warning_time']
 nuke_time = datetime.datetime.strptime(raw_nuke_time, time_format).time()
 warning_time = datetime.datetime.strptime(raw_warning_time, time_format).time()
+post_nuke_gifs = config.get('post_nuke_gifs') or {}
 monitoring_endpoint = config['monitoring']['endpoint']
 config_log_level = config['logging']['level']
 logging_dict = {'DEBUG': logging.DEBUG, 
@@ -46,151 +48,118 @@ def main():
         print(f'Channel nuke time is {nuke_time}, warning time is {warning_time} and timezone is {tz}')
         print(f'Setting presence to: {presence_msg}')
         await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=presence_msg))
-#        if not warning.is_running():
-#            warning.start()
-#            print('Starting deletion warning scheduled task')
-#        if not auto_nuke.is_running():
-#            auto_nuke.start()
-#            print('Starting auto nuke scheduled task')
+        if auto_nuke_enabled:
+            if not warning.is_running():
+                warning.start()
+                print('Starting deletion warning scheduled task')
+            if not auto_nuke.is_running():
+                auto_nuke.start()
+                print('Starting auto nuke scheduled task')
         if not monitor.is_running():
             monitor.start()
             print('Starting heartbeat scheduled task')
 
-    async def nuke_routine(ctx, weapon, deleted, message_count, auto_nuke=0, channel=0):
-        if deleted == 0:
-            if auto_nuke == 0:
-                print(f'Command called from {ctx.channel.name} by {ctx.author.name} using {weapon}')
-                print(f'Message count is {message_count}')
-                for _ in accepted_channels:
-                    if ctx.channel.id not in accepted_channels:
-                        print(f'{ctx.channel.name} is not in the accepted channel list, not running', flush=True)
-                        return
-
-            for i in range(3,0,-1):
-                if auto_nuke == 0:
-                    await ctx.channel.send(f'{weapon} in {i}')
-                else:
-                    await channel.send(f'{weapon} in {i}')
-                time.sleep(1)
-            if weapon == 'Nuke':
-                gifs = config['gifs']['nuke']
-                await ctx.send(file=discord.File(random.choice(gifs)))
-            elif weapon == 'Exterminatus' and auto_nuke == 0:
-                gifs = config['gifs']['exterminatus']
-                await ctx.channel.send('In his name')
-                await ctx.send(file=discord.File(random.choice(gifs)))
-            else:
-                gifs = config['gifs']['exterminatus']
-                await channel.send('In his name')
-                await channel.send(file=discord.File(random.choice(gifs)))
-            time.sleep(2)
-
-        if auto_nuke == 0:
-            deleted = len(await ctx.channel.purge(limit=100))
+    async def nuke_routine(channel, weapon):
+        countdown = None
+        for i in range(3,0,-1):
+            message = await channel.send(f'{weapon} in {i}')
+            countdown = countdown or message
+            await asyncio.sleep(1)
+        if weapon == 'Nuke':
+            gifs = config['gifs']['nuke']
         else:
-            deleted = len(await channel.purge(limit=100))
-        if deleted < 100:
-            embed = discord.Embed(title=f'{weapon} complete', color=0xe42313)
-            embed.description = f'{message_count} messages were destroyed'
-            if auto_nuke == 0:
-                await ctx.send(embed=embed)
-                spice_channels = [1317720410808258568, 1095581847917965343]
-                if ctx.channel.id in spice_channels:
-                    gifs = config['gifs']['spice']
-                    await ctx.send(file=discord.File(random.choice(gifs)))
-                elif ctx.channel.id == 1126322559122677812:
-                    gifs = config['gifs']['helen']
-                    await ctx.send(file=discord.File(random.choice(gifs)))
-            else:
-                await channel.send(embed=embed)
-                spice_channels = [1317720410808258568, 1095581847917965343]
-                if channel.id in spice_channels:
-                    gifs = config['gifs']['spice']
-                    await channel.send(file=discord.File(random.choice(gifs)))
-                elif ctx.channel.id == 1126322559122677812:
-                    gifs = config['gifs']['helen']
-                    await channel.send(file=discord.File(random.choice(gifs)))
-            print(f'{weapon} complete. {message_count} messages were deleted.', flush=True)
+            gifs = config['gifs']['exterminatus']
+            await channel.send('In his name')
+        await channel.send(file=discord.File(random.choice(gifs)))
+        await asyncio.sleep(2)
+
+        # Only count what was there before the countdown, then sweep up the countdown messages too
+        message_count = len(await channel.purge(limit=None, before=countdown))
+        await channel.purge(limit=None)
+
+        embed = discord.Embed(title=f'{weapon} complete', color=0xe42313)
+        embed.description = f'{message_count} messages were destroyed'
+        await channel.send(embed=embed)
+        gif_set = post_nuke_gifs.get(channel.id)
+        if gif_set:
+            await channel.send(file=discord.File(random.choice(config['gifs'][gif_set])))
+        print(f'{weapon} complete. {message_count} messages were deleted.', flush=True)
+
+    async def launch(ctx, view):
+        if ctx.channel.id not in accepted_channels:
+            print(f'{ctx.channel.name} is not in the accepted channel list, not running', flush=True)
+            await ctx.respond('This channel is not in the accepted channel list.', ephemeral=True)
             return
-        elif auto_nuke == 0:
-            await nuke_routine(ctx, weapon, deleted+100, message_count)
-            return
-        else:
-            await nuke_routine(ctx, weapon, deleted+100, message_count, auto_nuke, channel)
-            return
-    
-    @bot.slash_command(description='Nukes the chat in a spectacular white hot fireball', guild_ids=guilds)
-    async def nuke(ctx):
-        view = nuke_controls()
+        weapon = ctx.command.qualified_name.capitalize()
         await ctx.respond(view=view)
         await view.wait()
         if view.value:
-            print('Deploying nuke')
-            message_count = 0
-            deleted = 0
-            auto_nuke = 0
-            channel = 0
-            weapon = ctx.command.qualified_name.capitalize()
-            async for _ in ctx.channel.history(limit=None):
-                message_count += 1
-            await nuke_routine(ctx, weapon, deleted, message_count, auto_nuke)
+            print(f'Command called from {ctx.channel.name} by {ctx.author.name} using {weapon}')
+            await nuke_routine(ctx.channel, weapon)
         else:
-            print('Aborting nuke')
-            return
+            print(f'Aborting {weapon.lower()}')
+
+    @bot.slash_command(description='Nukes the chat in a spectacular white hot fireball', guild_ids=guilds)
+    async def nuke(ctx):
+        await launch(ctx, nuke_controls())
 
     @bot.slash_command(description='Calls down the holy wrath of the inquisition', guild_ids=guilds)
     async def exterminatus(ctx):
-        view = exterminatus_controls()
-        await ctx.respond(view=view)
-        await view.wait()
-        if view.value:
-            print('Deploying exterminatus')
-            message_count = 0
-            deleted = 0
-            auto_nuke = 0
-            channel = 0
-            weapon = ctx.command.qualified_name.capitalize()
-            async for _ in ctx.channel.history(limit=None):
-                message_count += 1
-            await nuke_routine(ctx, weapon, deleted, message_count, auto_nuke)
-        else:
-            print('Aborting exterminatus')
-            return
+        await launch(ctx, exterminatus_controls())
 
-    @tasks.loop(time=datetime.time(hour=nuke_time.hour, minute=nuke_time.minute, tzinfo=tz), reconnect=False)
+    # py-cord's time based loops mix UTC dates with local times and misfire, so poll the clock each
+    # minute instead and fire at most once per day when the local time in the configured timezone matches
+    last_run = {}
+
+    def is_due(name, target):
+        now = datetime.datetime.now(tz)
+        if (now.hour, now.minute) != (target.hour, target.minute) or last_run.get(name) == now.date():
+            return False
+        last_run[name] = now.date()
+        return True
+
+    def get_accepted_channels():
+        for channel_id in accepted_channels:
+            channel = bot.get_channel(channel_id)
+            if channel is None:
+                print(f'Cannot see channel {channel_id}, skipping', flush=True)
+                continue
+            yield channel
+
+    @tasks.loop(minutes=1)
     async def auto_nuke():
+        if not is_due('auto_nuke', nuke_time):
+            return
         print('Deploying auto nuke')
-        weapon = 'Exterminatus'
-        message_count = 0
-        ctx = None
-        auto_nuke = 1
-        for channel_id in accepted_channels:
-            channel = bot.get_channel(channel_id)
-            async for _ in channel.history(limit=None):
-                message_count += 1
-            deleted = 0
-            await nuke_routine(ctx, weapon, deleted, message_count, auto_nuke, channel)
+        for channel in get_accepted_channels():
+            await nuke_routine(channel, 'Exterminatus')
 
-    @tasks.loop(time=datetime.time(hour=warning_time.hour, minute=warning_time.minute, tzinfo=tz), reconnect=False)
+    @tasks.loop(minutes=1)
     async def warning():
+        if not is_due('warning', warning_time):
+            return
         print('Sending deletion warning')
-        for channel_id in accepted_channels:
-            channel = bot.get_channel(channel_id)
+        for channel in get_accepted_channels():
             await channel.send('This channel will be nuked in 5 minutes!')
+
+    monitor_session = None
 
     @tasks.loop(seconds=59)
     async def monitor():
+        nonlocal monitor_session
+        if monitor_session is None:
+            monitor_session = aiohttp.ClientSession(raise_for_status=True, timeout=aiohttp.ClientTimeout(total=10))
         print('Sending heartbeat to monitoring.gnuplusadam.com')
-        async with aiohttp.ClientSession(raise_for_status=True) as session:
-            try:
-                monitor = await session.get(monitoring_endpoint)
-                data = await monitor.json()
-                if data['ok'] == True:
-                    return
-                else:
-                    print('Didn\'t get expected response from monitoring endpoint.')
-            except aiohttp.ClientResponseError as e:
-                print('Connection error, monitoring endpoint is down!!', str(e))
+        try:
+            async with monitor_session.get(monitoring_endpoint) as response:
+                data = await response.json()
+            if isinstance(data, dict) and data.get('ok') == True:
+                return
+            print('Didn\'t get expected response from monitoring endpoint.')
+        except aiohttp.ClientResponseError as e:
+            print('Monitoring endpoint returned an error!!', str(e))
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
+            print('Connection error, monitoring endpoint is down!!', repr(e))
             
     bot.run(discord_token)
 
