@@ -31,6 +31,7 @@ nuke_time = datetime.datetime.strptime(raw_nuke_time, time_format).time()
 warning_time = datetime.datetime.strptime(raw_warning_time, time_format).time()
 warning_lead = (nuke_time.hour * 60 + nuke_time.minute - warning_time.hour * 60 - warning_time.minute) % (24 * 60)
 post_nuke_gifs = config.get('post_nuke_gifs') or {}
+obliterate_users = config['discord'].get('obliterate_users') or []
 monitoring_endpoint = config['monitoring']['endpoint']
 config_log_level = config['logging']['level']
 
@@ -86,15 +87,10 @@ def main():
             await asyncio.sleep(1)
         return first
 
-    async def finish(channel, weapon, description, gifs=None):
-        if gifs:
-            await channel.send(file=discord.File(random.choice(gifs)))
+    async def finish(channel, weapon, description):
         embed = discord.Embed(title=f'{weapon} complete', color=0xe42313)
         embed.description = description
         await channel.send(embed=embed)
-        gif_set = post_nuke_gifs.get(channel.id)
-        if gif_set:
-            await channel.send(file=discord.File(random.choice(config['gifs'][gif_set])))
 
     async def nuke_routine(channel, weapon):
         first = await countdown(channel, weapon)
@@ -111,6 +107,9 @@ def main():
         await channel.purge(limit=None)
 
         await finish(channel, weapon, f'{message_count} messages were destroyed')
+        gif_set = post_nuke_gifs.get(channel.id)
+        if gif_set:
+            await channel.send(file=discord.File(random.choice(config['gifs'][gif_set])))
         log.info(f'{weapon} complete. {message_count} messages were deleted.')
 
     async def obliterate_routine(channel, weapon):
@@ -125,8 +124,11 @@ def main():
             await new_channel.delete(reason=f'{weapon} failed')
             raise
         replace_channel_id(channel.id, new_channel.id)
-        await finish(new_channel, weapon, 'The channel was erased from existence',
-                     config['gifs'].get('obliterate') or config['gifs']['nuke'])
+        # Once the channel is back, show the old one collapsing into nothing instead of the usual weapon and post-nuke gifs
+        gifs = config['gifs'].get('obliterate')
+        if gifs:
+            await new_channel.send(file=discord.File(random.choice(gifs)))
+        await finish(new_channel, weapon, 'The channel was erased from existence')
         log.info(f'{weapon} complete. Channel {channel.name} recreated as {new_channel.id}.')
 
     async def launch(ctx, view, routine):
@@ -153,6 +155,10 @@ def main():
 
     @bot.slash_command(description='Erases the channel from existence and rebuilds it, instantly', guild_ids=guilds)
     async def obliterate(ctx):
+        if ctx.author.id not in obliterate_users:
+            log.info(f'{ctx.author.name} tried to obliterate {ctx.channel.name} but is not allowed to')
+            await ctx.respond('Only the chosen may obliterate.', ephemeral=True)
+            return
         if not ctx.channel.permissions_for(ctx.guild.me).manage_channels:
             await ctx.respond('I need the Manage Channels permission to obliterate this channel.', ephemeral=True)
             return

@@ -9,6 +9,10 @@ discord:
     - guildid
     - secondguildid
 
+  # Users allowed to use /obliterate
+  obliterate_users:
+    - userid
+
   presence_msg: 'Some presence message'
 
   # IANA timezone name the delete and warning times are in
@@ -38,6 +42,9 @@ gifs:
     - "assets/images/india2.gif"
     - "assets/images/india3.gif"
     - "assets/images/india4.gif"
+  # Posted in the recreated channel after /obliterate
+  obliterate:
+    - "assets/images/obliterate1.gif"
 
 # Extra gif posted after a nuke completes, channel id: gif set from above
 post_nuke_gifs:
