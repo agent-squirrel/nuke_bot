@@ -99,7 +99,8 @@ def main():
                     gifs = config['gifs']['spice']
                     await ctx.send(file=discord.File(random.choice(gifs)))
                 elif ctx.channel.id == 1126322559122677812:
-                    await ctx.send(file=discord.File('assets/images/yakobs.gif'))
+                    gifs = config['gifs']['helen']
+                    await ctx.send(file=discord.File(random.choice(gifs)))
             else:
                 await channel.send(embed=embed)
                 spice_channels = [1317720410808258568, 1095581847917965343]
@@ -107,7 +108,8 @@ def main():
                     gifs = config['gifs']['spice']
                     await channel.send(file=discord.File(random.choice(gifs)))
                 elif ctx.channel.id == 1126322559122677812:
-                    await ctx.send(file=discord.File('assets/images/yakobs.gif'))
+                    gifs = config['gifs']['helen']
+                    await channel.send(file=discord.File(random.choice(gifs)))
             print(f'{weapon} complete. {message_count} messages were deleted.', flush=True)
             return
         elif auto_nuke == 0:

@@ -1,12 +1,19 @@
 ---
 discord:
-  token: 
+  token:
   accepted_channels:
     - channelid
     - secondchannelid
+
+  guilds:
+    - guildid
+    - secondguildid
+
+  presence_msg: 'Some presence message'
+
   # 24 hour notation
-  channel_delete_time: '10:00'
   channel_warning_time: '09:55'
+  channel_delete_time: '10:00'
 
 gifs:
   exterminatus:
@@ -17,6 +24,18 @@ gifs:
     - "assets/images/nuke1.gif"
     - "assets/images/nuke2.gif"
     - "assets/images/nuke3.gif"
+  spice:
+    - "assets/images/spice1.gif"
+    - "assets/images/spice2.gif"
+    - "assets/images/spice3.gif"
+  helen:
+    - "assets/images/india1.gif"
+    - "assets/images/india2.gif"
+    - "assets/images/india3.gif"
+    - "assets/images/india4.gif"
 
 monitoring:
   endpoint: 'https://someendpoint.com'
+
+logging:
+  level: WARNING
