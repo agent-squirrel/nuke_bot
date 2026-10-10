@@ -1,24 +1,32 @@
 #!/usr/bin/env python
-import discord
-from discord.ext import tasks, commands
+# Count the messages in a channel, e.g. ./count_messages.py 1558334429422686248 --post
+import argparse
 import asyncio
+import discord
 import yaml
-import time
 
 with open ('config.yaml', 'r') as f:
     config = yaml.safe_load(f)
     discord_token = config['discord']['token']
 
-intents = discord.Intents.default()
-intents.message_content = True
-client = discord.Client(intents=intents)
+parser = argparse.ArgumentParser(description='Count the messages in a channel.')
+parser.add_argument('channel_id', type=int, help='channel to count')
+parser.add_argument('--post', action='store_true', help='also post the count in the channel')
+args = parser.parse_args()
 
-@client.event
-async def on_ready():
-    channel = client.get_channel(1095581847917965343)
-    count = 0
-    async for _ in channel.history(limit=None):
-        count += 1
-    await channel.send("There were {} messages in {}".format(count, channel.mention))
+async def main():
+    # REST only, no gateway connection, so this can run alongside the bot on the same token
+    client = discord.Client()
+    await client.login(discord_token)
+    try:
+        channel = await client.fetch_channel(args.channel_id)
+        count = 0
+        async for _ in channel.history(limit=None):
+            count += 1
+        print(f'There were {count} messages in #{channel.name}')
+        if args.post:
+            await channel.send(f'There were {count} messages in {channel.mention}')
+    finally:
+        await client.close()
 
-client.run(discord_token)
+asyncio.run(main())

@@ -3,6 +3,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from buttons import nuke_controls, exterminatus_controls, obliterate_controls
 import asyncio
+import functools
 import discord
 import aiohttp
 import datetime
@@ -31,6 +32,7 @@ nuke_time = datetime.datetime.strptime(raw_nuke_time, time_format).time()
 warning_time = datetime.datetime.strptime(raw_warning_time, time_format).time()
 warning_lead = (nuke_time.hour * 60 + nuke_time.minute - warning_time.hour * 60 - warning_time.minute) % (24 * 60)
 post_nuke_gifs = config.get('post_nuke_gifs') or {}
+gif_load_time = 1.5
 obliterate_users = config['discord'].get('obliterate_users') or []
 monitoring_endpoint = config['monitoring']['endpoint']
 config_log_level = config['logging']['level']
@@ -49,6 +51,37 @@ console_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
 log.addHandler(console_handler)
 
 bot = discord.Bot()
+
+@functools.cache
+def gif_duration(path):
+    # Sum the frame delays from the gif's Graphic Control Extensions. Browsers (and so Discord)
+    # play a frame with no delay, or one under 20ms, for 100ms, so count them the same way
+    with open(path, 'rb') as f:
+        data = f.read()
+    pos = 13
+    if data[10] & 0x80:
+        pos += 3 * 2 ** ((data[10] & 0x07) + 1)
+    total = 0
+    delay = 0
+    while pos < len(data) and data[pos] != 0x3B:
+        if data[pos] == 0x21:
+            if data[pos + 1] == 0xF9:
+                delay = int.from_bytes(data[pos + 4:pos + 6], 'little')
+            pos += 2
+        elif data[pos] == 0x2C:
+            total += delay if delay >= 2 else 10
+            delay = 0
+            flags = data[pos + 9]
+            pos += 10
+            if flags & 0x80:
+                pos += 3 * 2 ** ((flags & 0x07) + 1)
+            pos += 1
+        else:
+            break
+        while pos < len(data) and data[pos]:
+            pos += data[pos] + 1
+        pos += 1
+    return total / 100
 
 def replace_channel_id(old_id, new_id):
     # Obliterating recreates the channel with a new id, so carry it over in memory and in the config file
@@ -99,8 +132,10 @@ def main():
         else:
             gifs = config['gifs']['exterminatus']
             await channel.send('In his name')
-        await channel.send(file=discord.File(random.choice(gifs)))
-        await asyncio.sleep(2)
+        gif = random.choice(gifs)
+        await channel.send(file=discord.File(gif))
+        # Let the gif play through once, plus time for clients to download it, before the messages go
+        await asyncio.sleep(gif_duration(gif) + gif_load_time)
 
         # Only count what was there before the countdown, then sweep up the countdown messages too
         message_count = len(await channel.purge(limit=None, before=first))
