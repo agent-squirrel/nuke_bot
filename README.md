@@ -66,6 +66,8 @@ To nuke the accepted channels automatically every day, set `auto_nuke: true`, se
 
 The channels to be deleted will receive a warning at the warning time and will then have their contents deleted at the deletion time.
 
+These settings are the defaults for every accepted channel. To configure the auto nuke for a channel on its own, add the channel id under `auto_nuke_channels` with any of `auto_nuke`, `channel_warning_time` and `channel_delete_time` to override, plus `weapon` (`nuke` or `exterminatus`, the default) to pick which one is used. This lets you, for example, leave `auto_nuke: false` at the top level and turn it on for just a few channels, or give each channel its own time. Channels must still be in `accepted_channels` to be nuked automatically.
+
 To post an extra gif after a nuke in specific channels, map the channel id to a gif set under `post_nuke_gifs`.
 
 Manually delete a channel's contents with either `/nuke` or for fun `/exterminatus`.

@@ -25,12 +25,14 @@ accepted_channels = config['discord']['accepted_channels']
 guilds = config['discord']['guilds']
 presence_msg = config['discord']['presence_msg']
 tz = ZoneInfo(config['discord']['timezone'])
-auto_nuke_enabled = config['discord'].get('auto_nuke', False)
-raw_nuke_time = config['discord']['channel_delete_time']
-raw_warning_time = config['discord']['channel_warning_time']
-nuke_time = datetime.datetime.strptime(raw_nuke_time, time_format).time()
-warning_time = datetime.datetime.strptime(raw_warning_time, time_format).time()
-warning_lead = (nuke_time.hour * 60 + nuke_time.minute - warning_time.hour * 60 - warning_time.minute) % (24 * 60)
+# The top level auto nuke settings are the defaults, entries in auto_nuke_channels override them per channel
+auto_nuke_defaults = {
+    'auto_nuke': config['discord'].get('auto_nuke', False),
+    'channel_warning_time': config['discord']['channel_warning_time'],
+    'channel_delete_time': config['discord']['channel_delete_time'],
+    'weapon': 'exterminatus',
+}
+auto_nuke_channels = config['discord'].get('auto_nuke_channels') or {}
 post_nuke_gifs = config.get('post_nuke_gifs') or {}
 gif_load_time = 1.5
 obliterate_users = config['discord'].get('obliterate_users') or []
@@ -49,6 +51,25 @@ log.addHandler(file_handler)
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
 log.addHandler(console_handler)
+
+def load_schedule(channel_id):
+    settings = {**auto_nuke_defaults, **(auto_nuke_channels.get(channel_id) or {})}
+    if not settings['auto_nuke']:
+        return None
+    nuke_time = datetime.datetime.strptime(settings['channel_delete_time'], time_format).time()
+    warning_time = datetime.datetime.strptime(settings['channel_warning_time'], time_format).time()
+    weapon = settings['weapon'].lower()
+    if weapon not in ('nuke', 'exterminatus'):
+        raise ValueError(f'Auto nuke weapon for channel {channel_id} must be nuke or exterminatus, not {weapon}')
+    return {
+        'nuke_time': nuke_time,
+        'warning_time': warning_time,
+        'warning_lead': (nuke_time.hour * 60 + nuke_time.minute - warning_time.hour * 60 - warning_time.minute) % (24 * 60),
+        'weapon': weapon.capitalize(),
+    }
+
+# Channel id: auto nuke schedule, only for accepted channels with auto nuke turned on
+schedules = {channel_id: schedule for channel_id in accepted_channels if (schedule := load_schedule(channel_id))}
 
 bot = discord.Bot()
 
@@ -86,8 +107,9 @@ def gif_duration(path):
 def replace_channel_id(old_id, new_id):
     # Obliterating recreates the channel with a new id, so carry it over in memory and in the config file
     accepted_channels[accepted_channels.index(old_id)] = new_id
-    if old_id in post_nuke_gifs:
-        post_nuke_gifs[new_id] = post_nuke_gifs.pop(old_id)
+    for mapping in (post_nuke_gifs, auto_nuke_channels, schedules):
+        if old_id in mapping:
+            mapping[new_id] = mapping.pop(old_id)
     with open(config_path, 'r') as f:
         text = f.read()
     with open(f'{config_path}.tmp', 'w') as f:
@@ -98,16 +120,17 @@ def main():
     @bot.event
     async def on_ready():
         log.info('Weapons ready')
-        log.info(f'Channel nuke time is {nuke_time}, warning time is {warning_time} and timezone is {tz}')
+        log.info(f'Auto nuke timezone is {tz}')
+        for channel_id, schedule in schedules.items():
+            channel = bot.get_channel(channel_id)
+            log.info(f'Auto {schedule["weapon"].lower()} for {channel.name if channel else channel_id} at {schedule["nuke_time"]}, warning at {schedule["warning_time"]}')
+        for channel_id in auto_nuke_channels.keys() - set(accepted_channels):
+            log.warning(f'Channel {channel_id} has auto nuke settings but is not in the accepted channel list, ignoring them')
         log.info(f'Setting presence to: {presence_msg}')
         await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=presence_msg))
-        if auto_nuke_enabled:
-            if not warning.is_running():
-                warning.start()
-                log.info('Starting deletion warning scheduled task')
-            if not auto_nuke.is_running():
-                auto_nuke.start()
-                log.info('Starting auto nuke scheduled task')
+        if schedules and not auto_nuke.is_running():
+            auto_nuke.start()
+            log.info('Starting auto nuke scheduled task')
         if not monitor.is_running():
             monitor.start()
             log.info('Starting heartbeat scheduled task')
@@ -199,8 +222,8 @@ def main():
             return
         await launch(ctx, obliterate_controls(), obliterate_routine)
 
-    # py-cord's time based loops mix UTC dates with local times and misfire, so poll the clock each
-    # minute instead and fire at most once per day when the local time in the configured timezone matches
+    # py-cord's time based loops mix UTC dates with local times and misfire, so poll the clock each minute
+    # instead and fire each job at most once per day when the local time in the configured timezone matches
     last_run = {}
 
     def is_due(name, target):
@@ -212,29 +235,36 @@ def main():
         last_run[name] = now.date()
         return True
 
-    def get_accepted_channels():
-        for channel_id in accepted_channels:
-            channel = bot.get_channel(channel_id)
-            if channel is None:
-                log.warning(f'Cannot see channel {channel_id}, skipping')
-                continue
-            yield channel
+    def get_channel(channel_id):
+        channel = bot.get_channel(channel_id)
+        if channel is None:
+            log.warning(f'Cannot see channel {channel_id}, skipping')
+        return channel
+
+    # Run each auto nuke as its own task so a slow one doesn't hold up the clock for channels due later
+    running_nukes = set()
+
+    def auto_nuke_done(task):
+        running_nukes.discard(task)
+        if not task.cancelled() and task.exception():
+            log.error('Auto nuke failed', exc_info=task.exception())
 
     @tasks.loop(minutes=1)
     async def auto_nuke():
-        if not is_due('auto_nuke', nuke_time):
-            return
-        log.info('Deploying auto nuke')
-        for channel in get_accepted_channels():
-            await nuke_routine(channel, 'Exterminatus')
-
-    @tasks.loop(minutes=1)
-    async def warning():
-        if not is_due('warning', warning_time):
-            return
-        log.info('Sending deletion warning')
-        for channel in get_accepted_channels():
-            await channel.send(f'This channel will be nuked in {warning_lead} minute{"" if warning_lead == 1 else "s"}!')
+        # Obliterating swaps channel ids in schedules, so iterate over a copy
+        for channel_id, schedule in list(schedules.items()):
+            if is_due(('warning', channel_id), schedule['warning_time']) and (channel := get_channel(channel_id)):
+                log.info(f'Sending deletion warning to {channel.name}')
+                lead = schedule['warning_lead']
+                try:
+                    await channel.send(f'This channel will be nuked in {lead} minute{"" if lead == 1 else "s"}!')
+                except discord.HTTPException as e:
+                    log.error(f'Could not send deletion warning to {channel.name}: {e}')
+            if is_due(('auto_nuke', channel_id), schedule['nuke_time']) and (channel := get_channel(channel_id)):
+                log.info(f'Deploying auto {schedule["weapon"].lower()} on {channel.name}')
+                task = asyncio.create_task(nuke_routine(channel, schedule['weapon']))
+                running_nukes.add(task)
+                task.add_done_callback(auto_nuke_done)
 
     monitor_session = None
 

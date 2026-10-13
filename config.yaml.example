@@ -24,6 +24,17 @@ discord:
   channel_warning_time: '09:55'
   channel_delete_time: '10:00'
 
+  # Per channel auto nuke settings, channel id: any of the settings above to override, plus the weapon
+  # (nuke or exterminatus, default exterminatus). Accepted channels not listed here use the defaults above
+  auto_nuke_channels:
+    channelid:
+      auto_nuke: true
+      channel_warning_time: '21:45'
+      channel_delete_time: '22:00'
+      weapon: nuke
+    secondchannelid:
+      auto_nuke: false
+
 gifs:
   exterminatus:
     - "assets/images/exterminatus1.gif"
